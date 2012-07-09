@@ -45,6 +45,7 @@ def readCSV(filename, date_name=None, date_format='%m/%d/%Y',
     rec = np.recarray((len(result.values()[0]),), dtype = dtypes)
     for key in namelist:
         rec[key] = np.array(result[key])
+    f.close()
     return rec
             
 

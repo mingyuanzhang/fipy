@@ -5,100 +5,73 @@ import os.path as op
 import sys
 
 
-def read_intraday_file(filename):
-    xls_file = xlrd.open_workbook(DZH_INTRADAY_FILE, encoding_override='gb18030')
-    xls_sheet = xls_file.sheet_by_index(0)
-    stock = str(xls_sheet.cell(0,0).value)
-    rows = [['Time', 'Price']]
-    for ii in range(2, xls_sheet.nrows):
-        newrow = [str(xls_sheet.cell(ii,0).value).split('.')[0], float(xls_sheet.cell(ii,1).value)]
+def converter_loop_simple(reader):
+    rows = []
+    for row in reader:
+        if len(row) > 19:
+            continue
+        newrow = [str(row[0]), str(row[1])] + \
+            [float(row[colid]) for colid in range(2, 18)] + \
+            [str(row[18])]
         rows.append(newrow)
-    return stock, rows
+    return rows
 
-def write_intraday_file(stock, data, output=''):
-    timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-    pathname = op.join(DZH_INTRADAY_TARGET_DIR, '_'.join([output, stock, timestamp]) + '.csv')
-    ff = open(pathname, 'w')
+def converter_loop_ampm(reader):
+    rows = []
+    def ampm_convert(ampm, timestamp):
+        if ampm == 'AM':
+            return timestamp
+        else :
+            hour = int(timestamp.split(':')[0]) + 12
+            timestamp = str(hour) + timestamp[2:]
+            return timestamp
+    for row in reader:
+        newrow = [str(row[0]), ampm_convert(str(row[1]), str(row[2]))] + \
+            [float(row[colid]) for colid in range(3, 19)] + \
+            [str(row[19])]
+        rows.append(newrow)
+    return rows
+
+def read_xls_file(filename):
+    ff = open(filename, 'r')
+    reader  = csv.reader(ff, delimiter='\t')
+    reader.next()
+    rows = [['date', 'time', 'lastprice', 'volume', 'cumvolume', 'volumevalue', 
+             'bid1', 'bidsize1', 'bid2', 'bidsize2', 'bid3', 'bidsize3', 
+             'ask1', 'asksize1', 'ask2', 'asksize2', 'ask3', 'asksize3',
+             'lastdirection']]
+    #try:
+    rows += converter_loop_simple(reader)
+    #except:
+    #    rows += converter_loop_ampm(reader)
+    ff.close()
+    return rows
+
+def write_csv_file(data, output='/tmp/tmp.csv'):
+    ff = open(output, 'w')
     csvwriter = csv.writer(ff)
     for row in data:
         csvwriter.writerow(row)
     ff.close() 
-    return pathname
+    return output
 
-def read_historical_intraday_file(filename):
-    xls_file = xlrd.open_workbook(DZH_DAILY_FILE, encoding_override='gb18030')
-    xls_sheet = xls_file.sheet_by_index(0)
-    stock = str(xls_sheet.cell(0,1).value)
-    rows = [['Datetime', 'Open', 'High', 'Low', 'Close', 'Volume', 'Amount']]
-    cur_year = datetime.datetime.now().year
-    pre_month = datetime.datetime.now().month
-    for ii in range(2, xls_sheet.nrows):
-        mdtime = str(xls_sheet.cell(ii,0).value).split('.')[0]
-        if len(mdtime) < 8:
-            mdtime = '0' + mdtime
-        cur_month = int(mdtime[:2])
-        if cur_month > pre_month:
-            cur_year -= 1
-        ymdtime = str(cur_year) + mdtime
-        pre_month = cur_month
-        newrow = [ymdtime] + [float(xls_sheet.cell(ii,jj).value) for jj in range(1, 7)]
-        rows.append(newrow)
-    return stock, rows    
-
-def read_daily_file(filename):
-    xls_file = xlrd.open_workbook(DZH_DAILY_FILE, encoding_override='gb18030')
-    xls_sheet = xls_file.sheet_by_index(0)
-    stock = str(xls_sheet.cell(0,1).value)
-    rows = [['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Amount']]
-    for ii in range(2, xls_sheet.nrows):
-        date = str(xls_sheet.cell(ii,0).value).split('.')[0]
-        newrow = [date] + [float(xls_sheet.cell(ii,jj).value) for jj in range(1, 7)]
-        rows.append(newrow)
-    return stock, rows    
-
-def write_daily_file(stock, data, output=''):
-    timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-    pathname = op.join(DZH_DAILY_TARGET_DIR, '_'.join([output, stock, timestamp]) + '.csv')
-    ff = open(pathname, 'w')
-    csvwriter = csv.writer(ff)
-    for row in data:
-        csvwriter.writerow(row)
-    ff.close()
-    return pathname
-
+def main(filename, outputdir):
+    newfilename = op.join(outputdir, op.split(filename)[-1].replace('.xls', '.csv'))
+    print "Reading %s ..."%filename
+    data = read_xls_file(filename)
+    print "Writing %s ..."%newfilename
+    write_csv_file(data, newfilename)
+    print "Done."
+                          
 def print_options():
-    print("Unknown option")
-    print("Options need to be:")
-    print("d: daily data")
-    print("i: historical intraday data")
-    print("t: top day intraday data")    
+    print "python etf_csv_andrew.py input.xls output_dir"
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 3:
         print_options()
         sys.exit()
-    option = sys.argv[1]
-    if len(sys.argv) > 2:
-        tag = sys.argv[2]
-    else :
-        tag = ''
-    if option == 'd':
-        print("Reading daily data....")
-        stock, data = read_daily_file(DZH_DAILY_FILE)
-        filename = write_daily_file(stock, data, tag)
-        print("Daily data wrote to %s"%filename)
-    elif option == 'i':
-        print("Reading historical intraday data....")
-        stock, data = read_historical_intraday_file(DZH_DAILY_FILE)
-        filename = write_daily_file(stock, data, tag)
-        print("Historical intraday data wrote to %s"%filename)
-    elif option == 't':
-        print("Reading top day intraday data....")
-        stock, data = read_intraday_file(DZH_INTRADAY_FILE)
-        filename = write_intraday_file(stock, data, tag)
-        print("Top day intraday data wrote to %s"%filename)
-    else :
-        print_options()
-        
+    input_file = sys.argv[1]
+    output_dir = sys.argv[2]
+    main(input_file, output_dir)
         
