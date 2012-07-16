@@ -8,7 +8,7 @@ import sys
 def converter_loop_simple(reader):
     rows = []
     for row in reader:
-        if len(row) > 19:
+        if len(row) > 19 or len(row) == 0:
             continue
         newrow = [str(row[0]), str(row[1])] + \
             [float(row[colid]) for colid in range(2, 18)] + \

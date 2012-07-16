@@ -1,0 +1,37 @@
+class Market(object):
+    def __init__(self):
+        pass
+
+    def load_data(self):
+        pass
+
+    def generate_book_update(self):
+        pass
+
+    def accept_message(self, message):
+        pass
+
+    def act_on_limit_order(self, limit_order):
+        pass
+
+    def act_on_market_order(self, market_order):
+        pass
+
+    def act_on_modify(self, modify):
+        pass
+
+    def act_on_cancel(self, cancel):
+        pass
+
+    def match_on_market_order(self, market_order):
+        pass
+
+    def match_on_book_update(self):
+        pass
+
+    def generate_message(self):
+        pass
+
+    def log_events(self):
+        pass
+
