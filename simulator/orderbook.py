@@ -21,7 +21,7 @@ class OrderBookDict(object):
         self.date = date
 
     def update(self, msg):
-        if order.get('exchange') == self.exchange and order.get('product') == self.product:
+        if msg.get('exchange') == self.exchange and msg.get('product') == self.product:
             if isinstance(msg, Order):
                 self.update_on_order(msg)
             elif isinstance(msg, Reject):
@@ -36,16 +36,16 @@ class OrderBookDict(object):
         orderid = order.order_id
         price = order.get('price')
         if side > 0:
-            buy_order_dict[price][orderid] = order
+            self.buy_order_dict[price][orderid] = order
         else :
-            sell_order_dict[price][orderid] = order
+            self.sell_order_dict[price][orderid] = order
     
     def find_price_for_orderid(self, orderid):
-        for price in buy_order_dict.keys():
-            if orderid in buy_order_dict[price].keys():
+        for price in self.buy_order_dict.keys():
+            if orderid in self.buy_order_dict[price].keys():
                 return 1, price
-        for price in sell_order_dict.keys():
-            if orderid in sell_order_dict[price].keys():
+        for price in self.sell_order_dict.keys():
+            if orderid in self.sell_order_dict[price].keys():
                 return -1, price
         return 0, 0
 
@@ -210,7 +210,46 @@ class OrderBookQueue(object):
 
 
     
-                                                             
+def test_order_book_dict():
+    obd = OrderBookDict('BB', 'aa', '20120101')
+    limitorder = LimitOrder(10.0, 100, 1, 'aa', 'BB')
 
+    obd.update(limitorder)
+    assert len(obd.buy_order_dict.keys()) == 1
+    assert len(obd.sell_order_dict.keys()) == 0
+    assert obd.buy_order_dict[10.0][limitorder.order_id] is limitorder
 
+    marketorder = MarketOrder(11, 100, -1, 'aa', 'BB')
 
+    obd.update(marketorder)
+    assert len(obd.buy_order_dict.keys()) == 1
+    assert len(obd.sell_order_dict.keys()) == 1
+    assert obd.sell_order_dict[11.0][marketorder.order_id] is marketorder
+
+    limitorder_bad = LimitOrder(10.0, 100, 1, 'aaa', 'BB')
+
+    obd.update(limitorder_bad)
+    assert len(obd.buy_order_dict.keys()) == 1
+    assert len(obd.sell_order_dict.keys()) == 1
+    
+    limitorder2 = LimitOrder(14, 100, 1, 'aa', 'BB')
+    limitorder3 = LimitOrder(10.5, 100, -1, 'aa', 'BB')
+    limitorder2.stamptime('')
+    limitorder3.stamptime('')
+    print limitorder2.to_string()
+    print limitorder3.to_string()
+    obd.update(limitorder3)
+    obd.update(limitorder2)
+    print obd.buy_order_dict.items()
+    print obd.sell_order_dict.items()
+    assert len(obd.buy_order_dict.keys()) == 2
+    assert len(obd.sell_order_dict.keys()) == 2
+    
+    reject = Reject(limitorder2.order_id, 'aa', 'BB')
+    obd.update(reject)
+    print obd.buy_order_dict.items()
+    print obd.sell_order_dict.items()
+
+    assert len(obd.buy_order_dict.keys()) == 1
+    assert len(obd.sell_order_dict.keys()) == 2
+    assert obd.find_price_for_orderid(limitorder2.order_id) == (0,0)
